@@ -1,0 +1,51 @@
+version: "3"
+volumes:
+  oracle7:
+    driver: local
+services:
+
+ db:
+  build:
+      context: ./oracle-xe-11g
+  #image: oracleinanutshell/oracle-xe-11g:latest
+# carloscastillo/rgt-oracle-xe-11g stop EOF
+#datagrip/oracle:11.2 many user
+#oracleinanutshell/oracle-xe-11g:latest
+# sath89/oracle-xe-11g
+#andyrbell/oracle-xe-11g-centos:latest
+#christophesurmont/oracle-xe-11g
+  #host: db
+#  mem_min: 400m
+ # ports:
+  # - "8081:8080"
+  network_mode: host
+  volumes:
+   - ./damp:/damp
+#docker-entrypoint-initdb.d
+#   - ./:/u01/app/oracle/oradata/XE/
+   - oracle7:/u01/app/oracle/
+  environment:
+    - ORACLE_ALLOW_REMOTE=true
+
+ web:
+ # image: tomcat:latest
+  build:
+      context: ./tomcat
+  environment:
+     - TZ=CST
+#     - TOMCAT_USERNAME=1111
+#     - TOMCAT_PASSWORD=1111
+#    - JAVA_OPTS=-Doracle.host=db
+#    JDBC_URL: jdbc:oracle:thin:@db:1521:xe
+#connectTimeout=0&amp;socketTimeout=0&amp;autoReconnect=true
+#    JDBC_USER: system
+#    JDBC_PASS: oracle
+  network_mode: host
+#  ports:
+ #  - "80:8080"
+ # volumes:
+#    - ./tomcat/ROOT:/usr/local/tomcat/webapps/ROOT
+#    - ./tomcat/www.war:/usr/local/tomcat/webapps/ROOT.war
+#    - ./conf/:/usr/local/tomcat/conf/
+ # links:
+#    - db
