@@ -2,7 +2,36 @@ version: "3"
 volumes:
   oracle7:
     driver: local
+  pritunl_data:
+    driver: local
+  pritunl_db:
+    driver: local
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${SUBNET}
 services:
+ traefik:
+    image: traefik:alpine
+    command: --docker --acme.email="${ACME_EMAIL}" --api
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./traefik/acme.json:/acme.json"
+      - "./traefik/traefik.toml:/traefik.toml"
+    labels:
+#      - "traefik.docker.network=frontend"
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:${TRAEFIK_DOMAIN}; PathPrefixStrip:/traefik"
+      - "traefik.port=8080"
+      - "traefik.protocol=http"
+
 
  db:
   build:
@@ -22,15 +51,18 @@ services:
   volumes:
    - ./damp:/damp
 #docker-entrypoint-initdb.d
-#   - ./:/u01/app/oracle/oradata/XE/
    - oracle7:/u01/app/oracle/
   environment:
     - ORACLE_ALLOW_REMOTE=true
 
  web:
- # image: tomcat:latest
+# image: tomcat:latest
   build:
       context: ./tomcat
+  labels:
+      - 'traefik.port=8080'
+      - 'traefik.frontend.rule=Host:${TRAEFIK_DOMAIN}'
+
   environment:
      - TZ=CST
 #     - TOMCAT_USERNAME=1111
@@ -40,7 +72,7 @@ services:
 #connectTimeout=0&amp;socketTimeout=0&amp;autoReconnect=true
 #    JDBC_USER: system
 #    JDBC_PASS: oracle
-  network_mode: host
+#  network_mode: host
 #  ports:
  #  - "80:8080"
  # volumes:
@@ -49,3 +81,134 @@ services:
 #    - ./conf/:/usr/local/tomcat/conf/
  # links:
 #    - db
+
+ certdumper:
+    restart: always
+    image: mailu/traefik-certdumper:$VERSION
+    environment:
+    # Make sure this is the same as the main=-domain in traefik.toml
+    # !!! Also don’t forget to add "TRAEFIK_DOMAIN=[...]" to your .env!
+      - DOMAIN=mail.$TRAEFIK_DOMAIN
+    volumes:
+      - "./traefik:/traefik"
+      - "$ROOT/certs:/output"
+    labels:
+      - "traefik.enable=false"
+
+ front:
+    image: mailu/nginx:$VERSION
+    restart: always
+    env_file: .env
+    logging:
+      driver: $LOG_DRIVER
+    labels: # Traefik labels for simple reverse-proxying
+      - "traefik.enable=true"
+      - "traefik.port=80"
+      - "traefik.frontend.rule=Host:mail.$TRAEFIK_DOMAIN"
+#      - "traefik.docker.network=mailu_default"
+    ports:
+      - "${BIND_ADDRESS4}:110:110"
+      - "${BIND_ADDRESS4}:143:143"
+      - "${BIND_ADDRESS4}:993:993"
+      - "${BIND_ADDRESS4}:995:995"
+      - "${BIND_ADDRESS4}:25:25"
+      - "${BIND_ADDRESS4}:465:465"
+      - "${BIND_ADDRESS4}:587:587"
+#      - "$BIND_ADDRESS6:110:110"
+#      - "$BIND_ADDRESS6:143:143"
+#      - "$BIND_ADDRESS6:993:993"
+#      - "$BIND_ADDRESS6:995:995"
+#      - "$BIND_ADDRESS6:25:25"
+#      - "$BIND_ADDRESS6:465:465"
+#      - "$BIND_ADDRESS6:587:587"
+    volumes:
+      - "$ROOT/overrides/nginx:/overrides"
+      - "$ROOT/certs:/certs"
+
+ redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - "$ROOT/redis:/data"
+    labels:
+      - "traefik.enable=false"
+
+ imap:
+    image: mailu/dovecot:$VERSION
+    restart: always
+    env_file: .env
+    volumes:
+      - "$ROOT/mail:/mail"
+      - "$ROOT/overrides:/overrides"
+    depends_on:
+      - front
+    labels:
+      - "traefik.enable=false"
+
+ smtp:
+    image: mailu/postfix:$VERSION
+    restart: always
+    env_file: .env
+    volumes:
+      - "$ROOT/overrides:/overrides"
+    depends_on:
+      - front
+
+ antispam:
+    image: mailu/rspamd:$VERSION
+    restart: always
+    env_file: .env
+    volumes:
+      - "$ROOT/filter:/var/lib/rspamd"
+      - "$ROOT/dkim:/dkim"
+      - "$ROOT/overrides/rspamd:/etc/rspamd/override.d"
+    depends_on:
+      - front
+    labels:
+      - "traefik.enable=false"
+
+#  antivirus:
+#    image: mailu/$ANTIVIRUS:$VERSION
+#    restart: always
+#    env_file: .env
+#    volumes:
+#      - "$ROOT/filter:/data"
+
+ webdav:
+    image: mailu/$WEBDAV:$VERSION
+    restart: always
+    env_file: .env
+    volumes:
+      - "$ROOT/dav:/data"
+    labels:
+      - "traefik.enable=false"
+
+ admin:
+    image: mailu/admin:$VERSION
+    restart: always
+    env_file: .env
+    volumes:
+      - "$ROOT/data:/data"
+      - "$ROOT/dkim:/dkim"
+    depends_on:
+      - redis
+    labels:
+      - "traefik.enable=false"
+
+ webmail:
+    image: "mailu/$WEBMAIL:$VERSION"
+    restart: always
+    env_file: .env
+    volumes:
+      - "$ROOT/webmail:/data"
+    depends_on:
+      - imap
+    labels:
+      - "traefik.enable=false"
+
+ fetchmail:
+    image: mailu/fetchmail:$VERSION
+    restart: always
+    env_file: .env
+    labels:
+      - "traefik.enable=false"

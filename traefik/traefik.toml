@@ -1,0 +1,33 @@
+# This is just boilerplate stuff you probably have in your own config
+logLevel = "INFO"
+defaultEntryPoints = ["https","http"]
+insecureSkipVerify = true
+[entryPoints]
+  [entryPoints.http]
+  address = ":80"
+    [entryPoints.http.redirect]
+    entryPoint = "https"
+  [entryPoints.https]
+  address = ":443"
+  [entryPoints.https.tls]
+
+[docker]
+endpoint = "unix:///var/run/docker.sock"
+watch = true
+exposedByDefault = false
+
+# Make sure we get acme.json saved, and onHostRule enabled
+[acme]
+email = "ywewour@mgmail.com"
+storage = "acme.json"
+entryPoint = "https"
+onHostRule = true
+
+[acme.httpChallenge]
+entryPoint = "http"
+
+# This should include all of your mail domains, and main= should be your $TRAEFIK_DOMAIN
+#[[acme.domains]]
+ # main = "serversupport.pp.ua"
+  #sans = ["mail.serversupport.pp.ua"]
+
