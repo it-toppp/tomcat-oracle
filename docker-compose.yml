@@ -26,7 +26,6 @@ services:
       - "./traefik/acme.json:/acme.json"
       - "./traefik/traefik.toml:/traefik.toml"
     labels:
-#      - "traefik.docker.network=frontend"
       - "traefik.enable=true"
       - "traefik.frontend.rule=Host:${TRAEFIK_DOMAIN}; PathPrefixStrip:/traefik"
       - "traefik.port=8080"
@@ -35,22 +34,11 @@ services:
  db:
   build:
       context: ./oracle-xe-11g
-  #image: oracleinanutshell/oracle-xe-11g:latest
-# carloscastillo/rgt-oracle-xe-11g stop EOF
-#datagrip/oracle:11.2 many user
-#oracleinanutshell/oracle-xe-11g:latest
-# sath89/oracle-xe-11g
-#andyrbell/oracle-xe-11g-centos:latest
-#christophesurmont/oracle-xe-11g
-  #host: db
+  container_name: db
 #  mem_min: 400m
- # ports:
-  # - "8081:8080"
   restart: always
-#  network_mode: host
   volumes:
    - ./damp:/damp
-#docker-entrypoint-initdb.d
    - oracle:/u01/app/oracle/
   environment:
     - ORACLE_ALLOW_REMOTE=true
@@ -60,6 +48,7 @@ services:
 
  web:
 # image: tomcat:latest
+  container_name: db
   build:
       context: ./tomcat
   labels:
@@ -68,29 +57,16 @@ services:
   restart: always
   environment:
      - TZ=CST
-#     - TOMCAT_USERNAME=1111
-#     - TOMCAT_PASSWORD=1111
-#    - JAVA_OPTS=-Doracle.host=db
-#    JDBC_URL: jdbc:oracle:thin:@db:1521:xe
-#connectTimeout=0&amp;socketTimeout=0&amp;autoReconnect=true
-#    JDBC_USER: system
-#    JDBC_PASS: oracle
-#  network_mode: host
-#  ports:
-#   - "80:8080"
-#  volumes:
-#    - ./tomcat/ROOT:/usr/local/tomcat/webapps/ROOT
+  volumes:
+    - ./tomcat/ROOT:/usr/local/tomcat/webapps/ROOT
 #    - ./tomcat/www.war:/usr/local/tomcat/webapps/ROOT.war
 #    - ./conf/:/usr/local/tomcat/conf/
-#  links:
-#    - db
  vpn:
     image: 'jippi/pritunl:latest'
     privileged: true
     restart: always
     ports:
       - '1194:1194/udp'
-#      - '1194:1194/tcp'
     volumes:
       - 'vpn_data:/var/lib/pritunl'
       - 'vpn_db:/var/lib/mongodb'
@@ -98,6 +74,7 @@ services:
       - 'traefik.port=443'
       - "traefik.protocol=https"
       - 'traefik.frontend.rule=Host:vpn.${TRAEFIK_DOMAIN}'
+
  certdumper:
     restart: always
     image: mailu/traefik-certdumper:$VERSION
@@ -121,7 +98,6 @@ services:
       - "traefik.enable=true"
       - "traefik.port=80"
       - "traefik.frontend.rule=Host:mail.$TRAEFIK_DOMAIN"
-#      - "traefik.docker.network=mailu_default"
     ports:
       - "${BIND_ADDRESS4}:110:110"
       - "${BIND_ADDRESS4}:143:143"
@@ -169,6 +145,8 @@ services:
       - "$ROOT/overrides:/overrides"
     depends_on:
       - front
+    labels:
+      - "traefik.enable=false"
 
  antispam:
     image: mailu/rspamd:$VERSION
