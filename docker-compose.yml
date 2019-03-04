@@ -16,7 +16,7 @@ networks:
 services:
  traefik:
     image: traefik:alpine
-    command: --docker --acme.email="${ACME_EMAIL}" --api
+    command: --docker --acme.email="${ACME_EMAIL}"
     restart: always
     ports:
       - "80:80"
@@ -48,7 +48,7 @@ services:
 
  web:
 # image: tomcat:latest
-  container_name: db
+  container_name: web
   build:
       context: ./tomcat
   labels:
@@ -57,13 +57,13 @@ services:
   restart: always
   environment:
      - TZ=CST
-  volumes:
-    - ./tomcat/ROOT:/usr/local/tomcat/webapps/ROOT
+#  volumes:
 #    - ./tomcat/www.war:/usr/local/tomcat/webapps/ROOT.war
 #    - ./conf/:/usr/local/tomcat/conf/
  vpn:
     image: 'jippi/pritunl:latest'
     privileged: true
+    container_name: vpn
     restart: always
     ports:
       - '1194:1194/udp'
