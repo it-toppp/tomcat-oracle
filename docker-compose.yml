@@ -1,10 +1,10 @@
 version: "3"
 volumes:
-  oracle7:
+  oracle:
     driver: local
-  pritunl_data:
+  vpn_data:
     driver: local
-  pritunl_db:
+  vpn_db:
     driver: local
 networks:
   default:
@@ -32,7 +32,6 @@ services:
       - "traefik.port=8080"
       - "traefik.protocol=http"
 
-
  db:
   build:
       context: ./oracle-xe-11g
@@ -47,13 +46,17 @@ services:
 #  mem_min: 400m
  # ports:
   # - "8081:8080"
-  network_mode: host
+  restart: always
+#  network_mode: host
   volumes:
    - ./damp:/damp
 #docker-entrypoint-initdb.d
-   - oracle7:/u01/app/oracle/
+   - oracle:/u01/app/oracle/
   environment:
     - ORACLE_ALLOW_REMOTE=true
+  networks:
+      default:
+        ipv4_address: ${ORACLE_VPN_IP}
 
  web:
 # image: tomcat:latest
@@ -62,7 +65,7 @@ services:
   labels:
       - 'traefik.port=8080'
       - 'traefik.frontend.rule=Host:${TRAEFIK_DOMAIN}'
-
+  restart: always
   environment:
      - TZ=CST
 #     - TOMCAT_USERNAME=1111
@@ -74,14 +77,27 @@ services:
 #    JDBC_PASS: oracle
 #  network_mode: host
 #  ports:
- #  - "80:8080"
- # volumes:
+#   - "80:8080"
+#  volumes:
 #    - ./tomcat/ROOT:/usr/local/tomcat/webapps/ROOT
 #    - ./tomcat/www.war:/usr/local/tomcat/webapps/ROOT.war
 #    - ./conf/:/usr/local/tomcat/conf/
- # links:
+#  links:
 #    - db
-
+ vpn:
+    image: 'jippi/pritunl:latest'
+    privileged: true
+    restart: always
+    ports:
+      - '1194:1194/udp'
+#      - '1194:1194/tcp'
+    volumes:
+      - 'vpn_data:/var/lib/pritunl'
+      - 'vpn_db:/var/lib/mongodb'
+    labels:
+      - 'traefik.port=443'
+      - "traefik.protocol=https"
+      - 'traefik.frontend.rule=Host:vpn.${TRAEFIK_DOMAIN}'
  certdumper:
     restart: always
     image: mailu/traefik-certdumper:$VERSION
